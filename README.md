@@ -26,10 +26,15 @@ This section is for stuff blender needs for the material preview to work. it wil
 **Currently Supported RBM Types**
 
 -Carpaint (UV2 and UV3 support, but no deform support)
+
 -Bavarium Shield
+
 -Waterhull (could cause issues, last time I tested, my game crashed)
+
 -Window
+
 -Carlight
+
 
 **How to Export**
 
