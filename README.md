@@ -21,12 +21,16 @@ This section is where you plug in all of your textures. The tool will take the b
 
 This section is for stuff blender needs for the material preview to work. it will probably get bigger as I make the material previewing better.
 
+
 **Currently Supported RBM Types**
+
 -Carpaint (UV2 and UV3 support, but no deform support)
 -Bavarium Shield
 -Waterhull (could cause issues, last time I tested, my game crashed)
 -Window
 -Carlight
 
+
 **How to Export**
+
 When your model is set up with all the needed data, you need to make sure that each material is a different model, and that the model has only the nodegroup you want on it, then just click export. Then once you put all your textures in the right spot, the model should load correctly.
