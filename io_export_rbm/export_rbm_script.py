@@ -3,6 +3,7 @@ import bmesh
 import struct
 import math
 import mathutils
+import os
 
 def get_image_from_input(input_socket):
     if input_socket.is_linked:
@@ -345,12 +346,12 @@ def write_to_file(file_path, objects_data, min_max_positions):
                 f.write(decal_count_zones)
                 f.write(decal_width_global)
                 f.write(decal_width_zones)
-                f.write(decal_blend_global)
-                f.write(decal_blend_zones)
                 f.write(decal1_color)
                 f.write(decal2_color)
                 f.write(decal3_color)
                 f.write(decal4_color)
+                f.write(decal_blend_global)
+                f.write(decal_blend_zones)
                 f.write(damage_global)
                 f.write(damage_zones)
                 f.write(damage_blend_global)
@@ -505,7 +506,7 @@ def write_to_file(file_path, objects_data, min_max_positions):
                 f.write(diffuse_modulator)
                 f.write(tilingx)
                 f.write(tilingy)
-                f.write(bytes([0x00] * 1028))
+                f.write(bytes([0x00] * 1008))
                 f.write(bytes([0x06, 0x00, 0x00, 0x00]))
 
                 for path_length, path in obj_data['texture_paths']:
