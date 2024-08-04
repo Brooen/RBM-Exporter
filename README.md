@@ -31,7 +31,18 @@ This section is for stuff blender needs for the material preview to work. it wil
 -Window
 -Carlight
 
-
 **How to Export**
 
 When your model is set up with all the needed data, you need to make sure that each material is a different model, and that the model has only the nodegroup you want on it, then just click export. Then once you put all your textures in the right spot, the model should load correctly.
+
+**Credits**
+
+SK83RJOSH - Helping me with mesh normals, and eventually figuring them out
+
+Surasia - Also helping me with normals, and doing some script rewrites
+
+PredatorCZ - ApexLib repository, and helping me with some of the initial mapping of the RBM files
+
+Aaron Kirkham - JC Model Renderer, and its source code were very helpful in figuring out material data
+
+paxcut - Some help with learning how to map out binary files
