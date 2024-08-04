@@ -2,6 +2,7 @@
 Blender tool that converts models to Just Cause 3's RBM format
 
 **How To Use**
+
 To use, open a model and go to the RBM Export Panel in the Viewport. Then click "Add Scale Reference to scene" to ensure your model is lined up. Then you can delete the refrence object. Next you want to open your material and add a material model node. 
 Different nodes will have different inputs. Some have none, and some have a whole ton, but the basics are the same. Each node has different sections.
 
