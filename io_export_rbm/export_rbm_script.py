@@ -461,7 +461,8 @@ def write_to_file(file_path, objects_data, min_max_positions):
                 f.write(tint_power)
                 f.write(min_alpha)
                 f.write(uvscale)
-                f.write(bytes([0x00] * 16))
+                unkownf4 = bytes.fromhex("30 80 D6 BE 9A D9 D0 3F 4C 4F 68 BE 00 00 00 00")
+                f.write(unkownf4)
 
                 f.write(bytes([0x07, 0x00, 0x00, 0x00]))
 
@@ -472,14 +473,28 @@ def write_to_file(file_path, objects_data, min_max_positions):
 
                 f.write(bytes([0x00] * 16))
 
+                # Debugging: Print lengths of all lists
+                print(f"Number of vertices: {len(obj_data['vertices'])}")
+                print(f"Number of UV1s: {len(obj_data['uv1'])}")
+                print(f"Number of UV2s: {len(obj_data['uv2'])}")
+                print(f"Number of normals: {len(obj_data['normals'])}")
+                print(f"Number of tangents: {len(obj_data['tangents'])}")
+                print(f"Number of color values: {len(obj_data['color_values'])}")
+
                 f.write(struct.pack('<I', len(obj_data['vertices'])))
+
+                # Assuming color_values are floats in the range 0.0 to 1.0
+                float_color_values = obj_data['color_values'].get('ColorAndAlpha', (0.0, 0.0, 0.0, 0.0))
+                int_color_values = [int(255 * value) for value in float_color_values]  # Convert float to int (0-255)
+                color = struct.pack('<4B', *int_color_values)
+
                 for v, u1, u2, n, t in zip(obj_data['vertices'], obj_data['uv1'], obj_data['uv2'], obj_data['normals'], obj_data['tangents']):
                     f.write(struct.pack('<3f', *v))
                     f.write(struct.pack('<2f', *u1))
                     f.write(struct.pack('<2f', *u2))
                     f.write(struct.pack('<f', n))
                     f.write(struct.pack('<f', t))
-                    f.write(bytes([0xff, 0xff, 0xff, 0xff]))
+                    f.write(color)
 
                 f.write(struct.pack('<I', obj_data['face_indices_count']))
 

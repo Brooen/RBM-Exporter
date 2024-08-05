@@ -4,7 +4,7 @@ bl_info = {
     "category": "Import-Export",
     "description": "Exports selected objects to an RBM file",
     "author": "Brooen",
-    "version": (1, 0, 0),
+    "version": (1, 1, 1),
 }
 
 import bpy
