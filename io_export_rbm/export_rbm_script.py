@@ -124,6 +124,7 @@ def calculate_flags(material):
         'SUPPORT_DECALS': 0x1,
         'SUPPORT_DAMAGE_BLEND': 0x2,
         'SUPPORT_DIRT': 0x4,
+        'SUPPORT_PALETTE_FILE': 0x8,
         'SUPPORT_SOFT_TINT': 0x10,
         'SUPPORT_LAYERED': 0x20,
         'SUPPORT_OVERLAY': 0x40,
