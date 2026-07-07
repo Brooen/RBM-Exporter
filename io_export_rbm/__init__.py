@@ -33,6 +33,23 @@ class ExportRBM(bpy.types.Operator, ExportHelper):
         maxlen=255,
     )
 
+    def invoke(self, context, event):
+        selected_objects = context.selected_objects
+        if selected_objects:
+            # Prefer the active object if it's part of the selection,
+            # otherwise fall back to the first selected object.
+            active = context.active_object
+            if active in selected_objects:
+                base_name = active.name
+            else:
+                base_name = selected_objects[0].name
+        else:
+            base_name = "untitled"
+
+        self.filepath = base_name + self.filename_ext
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
     def execute(self, context):
         supported_nodegroups = ['CARPAINTMM', 'BAVARIUMSHIELD', 'WATERHULL', 'WINDOW', 'CARLIGHT']
         selected_objects = bpy.context.selected_objects
@@ -40,9 +57,9 @@ class ExportRBM(bpy.types.Operator, ExportHelper):
         objects_data = []
         for obj in selected_objects:
             print(f"Processing object: {obj.name}")
-            obj_data = export_rbm_script.process_object(obj, supported_nodegroups)
-            if obj_data:
-                objects_data.append(obj_data)
+            obj_data_list = export_rbm_script.process_object(obj, supported_nodegroups)
+            if obj_data_list:
+                objects_data.extend(obj_data_list)
 
         if objects_data:
             min_max_positions = export_rbm_script.calculate_global_min_max(objects_data)
@@ -65,8 +82,6 @@ class AppendNodeGroupOperator(bpy.types.Operator):
         with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
             if self.node_group_name in data_from.node_groups:
                 data_to.node_groups = [self.node_group_name]
-            if "ScaleReference" in data_from.objects:
-                data_to.objects = ["ScaleReference"]
 
         for node_group in data_to.node_groups:
             print(f"Appended node group: {node_group.name}")
@@ -81,23 +96,6 @@ class AppendNodeGroupOperator(bpy.types.Operator):
         node_tree = material.node_tree
         node = node_tree.nodes.new("ShaderNodeGroup")
         node.node_tree = bpy.data.node_groups[self.node_group_name]
-
-        return {'FINISHED'}
-
-
-class AppendScaleReferenceOperator(bpy.types.Operator):
-    bl_idname = "object.append_scale_reference"
-    bl_label = "Add Scale Reference to scene"
-
-    def execute(self, context):
-        filepath = os.path.join(addon_dir, "assets.blend")
-        with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
-            data_to.objects = [name for name in data_from.objects if name == "ScaleReference"]
-
-        for obj in data_to.objects:
-            if obj is not None:
-                bpy.context.collection.objects.link(obj)
-                print(f"Appended scale reference object: {obj.name}")
 
         return {'FINISHED'}
 
@@ -128,9 +126,6 @@ class RBM_PT_Panel(bpy.types.Panel):
         row.operator("object.append_node_group", text="Add CARLIGHT to material").node_group_name = "CARLIGHT"
 
         row = layout.row()
-        row.operator("object.append_scale_reference", text="Add Scale Reference to scene")
-
-        row = layout.row()
         row.operator(ExportRBM.bl_idname, text="Export RBM to file")
 
 
@@ -141,7 +136,6 @@ def menu_func_export(self, context):
 def register():
     bpy.utils.register_class(ExportRBM)
     bpy.utils.register_class(AppendNodeGroupOperator)
-    bpy.utils.register_class(AppendScaleReferenceOperator)
     bpy.utils.register_class(RBM_PT_Panel)
     bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
@@ -149,7 +143,6 @@ def register():
 def unregister():
     bpy.utils.unregister_class(ExportRBM)
     bpy.utils.unregister_class(AppendNodeGroupOperator)
-    bpy.utils.unregister_class(AppendScaleReferenceOperator)
     bpy.utils.unregister_class(RBM_PT_Panel)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 

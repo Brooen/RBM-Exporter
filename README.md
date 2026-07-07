@@ -38,7 +38,7 @@ This section is for stuff blender needs for the material preview to work. it wil
 
 **How to Export**
 
-When your model is set up with all the needed data, you need to make sure that each material is a different model, and that the model has only the nodegroup you want on it, then just click export. Then once you put all your textures in the right spot, the model should load correctly.
+When your model is set up with all the needed data, you need to make sure that the material has only the nodegroup you want on it, then just click export. Then once you put all your textures in the right spot, the model should load correctly.
 
 **Credits**
 

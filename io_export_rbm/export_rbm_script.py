@@ -12,6 +12,8 @@ def get_image_from_input(input_socket):
             return from_node.image.name
     return None
 
+import os
+
 def get_texture_paths(material, group_name):
     texture_names_by_group = {
         'CARPAINTMM': [
@@ -29,42 +31,54 @@ def get_texture_paths(material, group_name):
         ]
     }
 
-    base_path = ''
     texture_paths = []
 
     if not material.node_tree:
         return texture_paths
-    
+
     node_tree = material.node_tree
     node_group = None
-    
+
+    # Locate the node group within the material
     for node in node_tree.nodes:
         if node.type == 'GROUP' and node.node_tree.name == group_name:
             node_group = node
             break
-    
-    if node_group:
-        for input in node_group.inputs:
-            if input.name == 'Base Path':
-                base_path = input.default_value
-                break
 
-        texture_names = texture_names_by_group.get(group_name, [])
-        for texture_name in texture_names:
-            path_length = 0
-            path = ''
+    if node_group:
+        for texture_name in texture_names_by_group.get(group_name, []):
+            texture_path_input = f"{texture_name} Path"
+            texture_path = ""
+            image_name = ""
+
+            # Find the texture path (directory)
+            for input in node_group.inputs:
+                if input.name == texture_path_input:
+                    texture_path = input.default_value.strip()  # Get the texture folder and remove extra spaces
+                    break
+
+            # Find the image file name (if connected)
             for input in node_group.inputs:
                 if input.name == texture_name:
-                    image_name = get_image_from_input(input)
+                    image_name = get_image_from_input(input)  # Get the image file
                     if image_name:
-                        # Remove the current extension and change it to .ddsc
-                        base_name, _ = os.path.splitext(image_name)
-                        new_image_name = f"{base_name}.ddsc"
-                        path = f"{base_path}/{new_image_name}"
-                        path_length = len(path.encode('utf-8'))
-            texture_paths.append((path_length, path))
-    
+                        image_name, _ = os.path.splitext(image_name)  # Remove extension
+                        image_name = f"{image_name}.ddsc"  # Ensure .ddsc extension
+                    break
+
+            # Combine texture path and image name, enforcing forward slashes
+            full_path = f"{texture_path}/{image_name}" if image_name else texture_path
+            full_path = full_path.replace("\\", "/")  # Ensure forward slashes
+
+            # Ensure entry is always included, even if path is empty
+            path_length = len(full_path.encode('utf-8')) if full_path else 0
+            texture_paths.append((path_length, full_path))
+
     return texture_paths
+
+
+
+
 
 def get_node_values(material, group_name):
     node_values = {}
@@ -151,45 +165,19 @@ def compress_normal(vec):
     return x + y + z
 
 def process_object(obj, supported_nodegroups):
-    material = obj.active_material
-    if material is None:
-        print(f"Object {obj.name} has no material.")
-        return None
+    """Return a list of render-block dicts, one per material slot on this
+    object that uses a supported node group. Geometry is split by
+    face.material_index so each block only contains its own triangles."""
+    if obj.type != 'MESH':
+        print(f"Object {obj.name} is not a mesh, skipping.")
+        return []
 
-    node_group_name = None
-    if material.use_nodes:
-        for node in material.node_tree.nodes:
-            if node.type == 'GROUP' and node.node_tree.name in supported_nodegroups:
-                node_group_name = node.node_tree.name
-                break
+    mesh = obj.data
+    if not mesh.materials:
+        print(f"Object {obj.name} has no material slots.")
+        return []
 
-    if not node_group_name:
-        print(f"No supported node group found in the material of {obj.name}.")
-        return None
-
-    flags_value = calculate_flags(material)
-    print(f"Object: {obj.name}, Node Group: {node_group_name}, Calculated flags value: {flags_value:#010x}")
-
-    texture_paths = get_texture_paths(material, node_group_name)
-    print(f"Object: {obj.name}, Texture paths:")
-    for length, path in texture_paths:
-        print(f"Length: {length}, Path: {path}")
-
-    node_values = get_node_values(material, node_group_name)
-    print(f"Object: {obj.name}, Node values:")
-    for name, value in node_values.items():
-        print(f"Name: {name}, Value: {value}")
-
-    color_values = get_color_values(material, node_group_name)
-    print(f"Object: {obj.name}, Color values:")
-    for name, value in color_values.items():
-        print(f"Name: {name}, Value: {value}")
-
-    boolean_values = get_boolean_values(material, node_group_name)
-    print(f"Object: {obj.name}, Boolean values:")
-    for name, value in boolean_values.items():
-        print(f"Name: {name}, Value: {value}")
-
+    # Build a triangulated, rotated copy of the mesh once.
     mesh_copy = obj.data.copy()
     bm = bmesh.new()
     bm.from_mesh(mesh_copy)
@@ -202,9 +190,12 @@ def process_object(obj, supported_nodegroups):
     bm.to_mesh(mesh_copy)
     bm.free()
     mesh_copy.update()
+
     bm = bmesh.new()
     bm.from_mesh(mesh_copy)
+    bm.verts.ensure_lookup_table()
 
+    # Global per-vertex data (indexed by vertex index).
     vertices = [(v.co.x, v.co.y, v.co.z) for v in bm.verts]
 
     uv1 = [(0, 0)] * len(vertices)
@@ -240,29 +231,92 @@ def process_object(obj, supported_nodegroups):
         normals[idx] = compress_normal(normal)
         tangents[idx] = math.copysign(compress_normal(tangent), -bitangent_sign)
 
-    faces = [tuple(vert.index for vert in face.verts) for face in bm.faces]
-    face_indices_count = len(faces) * 3
+    # Group triangles by the material slot they belong to.
+    faces_by_material = {}
+    for face in bm.faces:
+        faces_by_material.setdefault(face.material_index, []).append(
+            tuple(vert.index for vert in face.verts)
+        )
 
     bm.free()
 
-    object_data = {
-        'vertices': vertices,
-        'flags_value': flags_value,
-        'texture_paths': texture_paths,
-        'normals': normals,
-        'tangents': tangents,
-        'uv1': uv1,
-        'uv2': uv2,
-        'uv3': uv3,
-        'faces': faces,
-        'face_indices_count': face_indices_count,
-        'node_group_name': node_group_name,
-        'node_values': node_values,
-        'color_values': color_values,
-        'boolean_values': boolean_values,
-    }
+    objects_data = []
 
-    return object_data
+    # Emit one render block per material slot with a supported node group.
+    for material_index, mat_faces in sorted(faces_by_material.items()):
+        if material_index >= len(mesh.materials):
+            continue
+        material = mesh.materials[material_index]
+        if material is None:
+            print(f"Object {obj.name}: material slot {material_index} is empty, skipping.")
+            continue
+
+        node_group_name = None
+        if material.use_nodes and material.node_tree:
+            for node in material.node_tree.nodes:
+                if (node.type == 'GROUP' and node.node_tree
+                        and node.node_tree.name in supported_nodegroups):
+                    node_group_name = node.node_tree.name
+                    break
+
+        if not node_group_name:
+            print(f"Object {obj.name}: material '{material.name}' has no supported "
+                  f"node group, skipping this slot.")
+            continue
+
+        # Remap global vertex indices down to just those used by this slot,
+        # so each block has a compact, self-contained vertex buffer.
+        remap = {}
+        local_faces = []
+        for tri in mat_faces:
+            new_tri = []
+            for old_idx in tri:
+                new_idx = remap.get(old_idx)
+                if new_idx is None:
+                    new_idx = len(remap)
+                    remap[old_idx] = new_idx
+                new_tri.append(new_idx)
+            local_faces.append(tuple(new_tri))
+
+        ordered = sorted(remap.items(), key=lambda kv: kv[1])
+        local_vertices = [vertices[old] for old, _ in ordered]
+        local_uv1 = [uv1[old] for old, _ in ordered]
+        local_uv2 = [uv2[old] for old, _ in ordered]
+        local_uv3 = [uv3[old] for old, _ in ordered]
+        local_normals = [normals[old] for old, _ in ordered]
+        local_tangents = [tangents[old] for old, _ in ordered]
+
+        flags_value = calculate_flags(material)
+        texture_paths = get_texture_paths(material, node_group_name)
+        node_values = get_node_values(material, node_group_name)
+        color_values = get_color_values(material, node_group_name)
+        boolean_values = get_boolean_values(material, node_group_name)
+
+        print(f"Object: {obj.name}, Slot {material_index} ('{material.name}'), "
+              f"Node Group: {node_group_name}, Verts: {len(local_vertices)}, "
+              f"Tris: {len(local_faces)}, Flags: {flags_value:#010x}")
+
+        objects_data.append({
+            'vertices': local_vertices,
+            'flags_value': flags_value,
+            'texture_paths': texture_paths,
+            'normals': local_normals,
+            'tangents': local_tangents,
+            'uv1': local_uv1,
+            'uv2': local_uv2,
+            'uv3': local_uv3,
+            'faces': local_faces,
+            'face_indices_count': len(local_faces) * 3,
+            'node_group_name': node_group_name,
+            'node_values': node_values,
+            'color_values': color_values,
+            'boolean_values': boolean_values,
+        })
+
+    if not objects_data:
+        print(f"No supported materials found on {obj.name}.")
+
+    return objects_data
 
 def calculate_global_min_max(objects_data):
     all_vertices = [v for obj_data in objects_data for v in obj_data['vertices']]
@@ -516,13 +570,15 @@ def write_to_file(file_path, objects_data, min_max_positions):
                 diffuse_modulator = struct.pack('<4f', *color_values.get('DiffuseModulator', (0.0, 0.0, 0.0, 0.0)))              
                 tilingx = struct.pack('<f', node_values.get('TilingX', 0.0))
                 tilingy = struct.pack('<f', node_values.get('TilingY', 0.0))
+                f.write(bytes([0x00] * 4))
                 f.write(specular_gloss)
                 f.write(reflectivity)
+                f.write(bytes([0x00] * 16))
                 f.write(specular_fresnel)
                 f.write(diffuse_modulator)
                 f.write(tilingx)
                 f.write(tilingy)
-                f.write(bytes([0x00] * 1008))
+                f.write(bytes([0x00] * 1028))
                 f.write(bytes([0x06, 0x00, 0x00, 0x00]))
 
                 for path_length, path in obj_data['texture_paths']:
